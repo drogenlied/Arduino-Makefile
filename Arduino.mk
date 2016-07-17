@@ -1047,6 +1047,14 @@ ASFLAGS       += -x assembler-with-cpp
 LDFLAGS       += -$(MCU_FLAG_NAME)=$(MCU) -Wl,--gc-sections -O$(OPTIMIZATION_LEVEL)
 SIZEFLAGS     ?= --mcu=$(MCU) -C
 
+ifndef OBJCOPY_HEX_FLAGS
+    OBJCOPY_HEX_FLAGS = -O ihex -R .eeprom
+endif
+
+ifndef OBJCOPY_EEP_FLAGS
+    OBJCOPY_EEP_FLAGS = -j .eeprom --set-section-flags=.eeprom='alloc,load' --change-section-lma .eeprom=0 -O ihex
+endif
+
 # for backwards compatibility, grab ARDUINO_PORT if the user has it set
 # instead of MONITOR_PORT
 MONITOR_PORT ?= $(ARDUINO_PORT)
@@ -1254,7 +1262,7 @@ $(OBJDIR)/core/%.S.o: $(ARDUINO_CORE_PATH)/%.S $(COMMON_DEPS) | $(OBJDIR)
 # various object conversions
 $(OBJDIR)/%.hex: $(OBJDIR)/%.elf $(COMMON_DEPS)
 	@$(MKDIR) $(dir $@)
-	$(OBJCOPY) -O ihex -R .eeprom $< $@
+	$(OBJCOPY) $(OBJCOPY_HEX_FLAGS) $< $@
 	@$(ECHO) '\n'
 	$(call avr_size,$<,$@)
 ifneq ($(strip $(HEX_MAXIMUM_SIZE)),)
@@ -1266,8 +1274,7 @@ endif
 
 $(OBJDIR)/%.eep: $(OBJDIR)/%.elf $(COMMON_DEPS)
 	@$(MKDIR) $(dir $@)
-	-$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom='alloc,load' \
-		--change-section-lma .eeprom=0 -O ihex $< $@
+	-$(OBJCOPY) $(OBJCOPY_EEP_FLAGS) $< $@
 
 $(OBJDIR)/%.lss: $(OBJDIR)/%.elf $(COMMON_DEPS)
 	@$(MKDIR) $(dir $@)
