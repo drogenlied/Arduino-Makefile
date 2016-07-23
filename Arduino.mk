@@ -1402,6 +1402,10 @@ ifneq ($(ISP_EEPROM), 0)
     AVRDUDE_ISPLOAD_OPTS += $(AVRDUDE_UPLOAD_EEP)
 endif
 
+ifndef UPLOAD_CMD
+    UPLOAD_CMD = $(AVRDUDE) $(AVRDUDE_COM_OPTS) $(AVRDUDE_ARD_OPTS) $(AVRDUDE_UPLOAD_HEX)
+endif
+
 ########################################################################
 # Explicit targets start here
 
@@ -1440,8 +1444,7 @@ raw_upload:	$(TARGET_HEX) verify_size
 		$(MAKE) do_upload
 
 do_upload:
-		$(AVRDUDE) $(AVRDUDE_COM_OPTS) $(AVRDUDE_ARD_OPTS) \
-			$(AVRDUDE_UPLOAD_HEX)
+		$(UPLOAD_CMD)
 
 do_eeprom:	$(TARGET_EEP) $(TARGET_HEX)
 		$(AVRDUDE) $(AVRDUDE_COM_OPTS) $(AVRDUDE_ARD_OPTS) \

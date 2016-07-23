@@ -265,9 +265,33 @@ OBJCOPY_EEP_FLAGS = $(ACFG_compiler.objcopy.eep.flags)
 #
 # may require additional patches for Windows support
 
-do_upload: override get_monitor_port=""
-AVRDUDE=@true
-RESET_CMD = nohup $(ACFG_tools.bossac.cmd) $(ACFG_tools.bossac.upload.params.verbose) --port=$(MONITOR_PORT) -U {upload.native_usb} -e -w $(ACFG_tools.bossac.upload.params.verify} -b $(TARGET_HEX) -R
+#do_upload: override get_monitor_port=""
+#AVRDUDE=@true
+
+NATIVE_UPLOAD = false
+
+ARD_RESET_ARDUINO := $(shell which ard-reset-arduino 2> /dev/null)
+ifndef ARD_RESET_ARDUINO
+# same level as *.mk in bin directory when checked out from git
+# or in $PATH when packaged
+ARD_RESET_ARDUINO = $(ARDMK_DIR)/bin/ard-reset-arduino
+endif
+
+ifeq ($(NATIVE_UPLOAD), true)
+    ifneq (,$(findstring CYGWIN,$(shell uname -s)))
+        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(DEVICE_PATH)
+    else
+        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(call get_monitor_port)
+    endif
+else
+    ifneq (,$(findstring CYGWIN,$(shell uname -s)))
+        RESET_CMD = $(ARD_RESET_ARDUINO) $(ARD_RESET_OPTS) $(DEVICE_PATH)
+    else
+        RESET_CMD = $(ARD_RESET_ARDUINO) $(ARD_RESET_OPTS) $(call get_monitor_port)
+    endif
+endif
+
+UPLOAD_CMD = $(ACFG_tools.bossac.cmd) $(ACFG_tools.bossac.upload.params.verbose) --port=$(MONITOR_PORT)  -U $(NATIVE_UPLOAD) -e -w $(ACFG_tools.bossac.upload.params.verify) -b $(TARGET_HEX) -R
 
 ########################################################################
 # automatially include Arduino.mk for the user
