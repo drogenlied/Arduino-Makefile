@@ -279,9 +279,9 @@ endif
 
 ifeq ($(TOUCH_PORT), true)
     ifneq (,$(findstring CYGWIN,$(shell uname -s)))
-        RESET_CMD = stty -F $(DEVICE_PATH) 1200; sleep 0.1; stty -F $(DEVICE_PATH) 115200
+        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(DEVICE_PATH)
     else
-        RESET_CMD = stty -F $(call get_monitor_port) 1200; sleep 0.1; stty -F $(call get_monitor_port) 115200
+        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(call get_monitor_port)
     endif
 else
     ifneq (,$(findstring CYGWIN,$(shell uname -s)))
