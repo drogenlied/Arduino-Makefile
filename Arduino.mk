@@ -883,9 +883,14 @@ endif
 
 # The name of the main targets
 TARGET_HEX = $(OBJDIR)/$(TARGET).hex
+TARGET_BIN = $(OBJDIR)/$(TARGET).bin
 TARGET_ELF = $(OBJDIR)/$(TARGET).elf
 TARGET_EEP = $(OBJDIR)/$(TARGET).eep
 CORE_LIB   = $(OBJDIR)/libcore.a
+
+ifndef TARGET_UPLOAD
+    TARGET_UPLOAD = $(TARGET_HEX)
+endif
 
 # Names of executables - chipKIT needs to override all to set paths to PIC32
 # tools, and we can't use "?=" assignment because these are already implicitly
@@ -1049,6 +1054,10 @@ SIZEFLAGS     ?= --mcu=$(MCU) -C
 
 ifndef OBJCOPY_HEX_FLAGS
     OBJCOPY_HEX_FLAGS = -O ihex -R .eeprom
+endif
+
+ifndef OBJCOPY_BIN_FLAGS
+    OBJCOPY_BIN_FLAGS = -O binary
 endif
 
 ifndef OBJCOPY_EEP_FLAGS
@@ -1272,6 +1281,16 @@ else
 	@touch $@.sizeok
 endif
 
+$(OBJDIR)/%.bin: $(OBJDIR)/%.elf $(COMMON_DEPS)
+	@$(MKDIR) $(dir $@)
+	$(OBJCOPY) $(OBJCOPY_BIN_FLAGS) $< $@
+ifneq ($(strip $(HEX_MAXIMUM_SIZE)),)
+	if [ `stat --printf="%s\n" $@` -le $(HEX_MAXIMUM_SIZE) ]; then touch $@.sizeok; fi
+else
+	@$(ECHO) "Maximum flash memory of $(BOARD_TAG) is not specified. Make sure the size of $@ is less than $(BOARD_TAG)\'s flash memory"
+	@touch $@.sizeok
+endif
+
 $(OBJDIR)/%.eep: $(OBJDIR)/%.elf $(COMMON_DEPS)
 	@$(MKDIR) $(dir $@)
 	-$(OBJCOPY) $(OBJCOPY_EEP_FLAGS) $< $@
@@ -1435,11 +1454,11 @@ error_on_caterina:
 
 # Use submake so we can guarantee the reset happens
 # before the upload, even with make -j
-upload:		$(TARGET_HEX) verify_size
+upload:		$(TARGET_UPLOAD) verify_size
 		$(MAKE) reset
 		$(MAKE) do_upload
 
-raw_upload:	$(TARGET_HEX) verify_size
+raw_upload:	$(TARGET_UPLOAD) verify_size
 		$(MAKE) error_on_caterina
 		$(MAKE) do_upload
 

@@ -1,16 +1,10 @@
 ########################################################################
 #
-# Support for Teensy 3.x boards
+# Support for Arduino Due boards
 #
-# https://www.pjrc.com/teensy/
-#
-# You must install teensyduino for this Makefile to work:
-#
-# http://www.pjrc.com/teensy/teensyduino.html
-#
-# Copyright (C) 2014 Jeremy Shaw <jeremy@n-heptane.com> based on
-# work that is copyright Sudar, Nicholas Zambetti, David A. Mellis
-# & Hernando Barragan.
+# Copyright (C) 2016 Jan M. Binder based on
+# work that is copyright Sudar, Nicholas Zambetti, David A. Mellis,
+# Hernando Barragan & Jeremy Shaw 
 #
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU Lesser General Public License as
@@ -54,6 +48,10 @@ endif
 
 ifndef COMPILER_DIR
     COMPILER_DIR        = $(TOOLS_DIR)/arm-none-eabi-gcc/4.8.3-2014q1
+endif
+
+ifndef LOADER_DIR
+    LOADER_DIR        = $(TOOLS_DIR)/bossac/1.6.1-arduino
 endif
 
 ifndef AVR_TOOLS_DIR
@@ -268,7 +266,9 @@ OBJCOPY_EEP_FLAGS = $(ACFG_compiler.objcopy.eep.flags)
 #do_upload: override get_monitor_port=""
 #AVRDUDE=@true
 
-NATIVE_UPLOAD = false
+TOUCH_PORT = $(strip $(ACFG_$(BOARD_TAG).upload.use_1200bps_touch))
+WAIT_PORT = $(strip $(ACFG_$(BOARD_TAG).upload.wait_for_upload_port))
+NATIVE_UPLOAD = $(strip $(ACFG_$(BOARD_TAG).upload.native_usb))
 
 ARD_RESET_ARDUINO := $(shell which ard-reset-arduino 2> /dev/null)
 ifndef ARD_RESET_ARDUINO
@@ -277,11 +277,11 @@ ifndef ARD_RESET_ARDUINO
 ARD_RESET_ARDUINO = $(ARDMK_DIR)/bin/ard-reset-arduino
 endif
 
-ifeq ($(NATIVE_UPLOAD), true)
+ifeq ($(TOUCH_PORT), true)
     ifneq (,$(findstring CYGWIN,$(shell uname -s)))
-        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(DEVICE_PATH)
+        RESET_CMD = stty -F $(DEVICE_PATH) 1200; sleep 0.1; stty -F $(DEVICE_PATH) 115200
     else
-        RESET_CMD = $(ARD_RESET_ARDUINO) --caterina $(ARD_RESET_OPTS) $(call get_monitor_port)
+        RESET_CMD = stty -F $(call get_monitor_port) 1200; sleep 0.1; stty -F $(call get_monitor_port) 115200
     endif
 else
     ifneq (,$(findstring CYGWIN,$(shell uname -s)))
@@ -291,7 +291,14 @@ else
     endif
 endif
 
-UPLOAD_CMD = $(ACFG_tools.bossac.cmd) $(ACFG_tools.bossac.upload.params.verbose) --port=$(MONITOR_PORT)  -U $(NATIVE_UPLOAD) -e -w $(ACFG_tools.bossac.upload.params.verify) -b $(TARGET_HEX) -R
+ifneq (,$(findstring CYGWIN,$(shell uname -s)))
+    DUE_PORT = $(DEVICE_PATH)
+else
+    DUE_PORT = $(notdir $(call get_monitor_port))
+endif
+
+TARGET_UPLOAD = $(TARGET_BIN)
+UPLOAD_CMD = $(LOADER_DIR)/$(ACFG_tools.bossac.cmd) --port=$(DUE_PORT) -U $(NATIVE_UPLOAD) -e -w $(ACFG_tools.bossac.upload.params.verify) -b $(TARGET_UPLOAD) -R
 
 ########################################################################
 # automatially include Arduino.mk for the user
