@@ -90,6 +90,8 @@ endef
 
 # parse boards.txt into makefile format
 # this gives us all of the variable substitutions in that file for free
+# obviously it is quite the hack but we do not have the build dir yet where we could store
+# an intermediate file
 # Explanation:
 # awk -F=                                       set = as field separator
 #   if ($$0 !~ /^($$|[:space:]*\#)/)            ignore all commented lines, also with spaces before comment
@@ -113,6 +115,8 @@ ACFG_build.system.path = $(ARDUINO_SYSTEM_PATH)
 
 # parse platform.txt into makefile format
 # this gives us all of the variable substitutions in that file for free
+# obviously it is quite the hack but we do not have the build dir yet where we could store
+# an intermediate file
 # Explanation:
 # awk -F=                                       set = as field separator
 #   if ($$0 !~ /^($$|[:space:]*\#)/)            ignore all commented lines, also with spaces before comment
@@ -220,6 +224,9 @@ endif
 
 ########################################################################
 # FLAGS
+
+EXTRA_CORE += USB avr
+
 ifndef USB_TYPE
     USB_TYPE = USB_SERIAL
 endif
@@ -245,15 +252,24 @@ ifeq ("$(ACFG_$(BOARD_TAG).build.elide_constructors)", "true")
     CXXFLAGS      += -felide-constructors
 endif
 
+# linker options
 LDFLAGS += $(ACFG_compiler.c.elf.flags)
-LDFLAGS += $(ACFG_$(BOARD_TAG).build.extra_flags)
-LDFLAGS += $(ARDUINO_VAR_PATH)/$(VARIANT)/$(ACFG_$(BOARD_TAG).build.variant_system_lib)
-LDFLAGS += $(ACFG_compiler.combine.flags)
-#LDFLAGS += -Wl,--cref -Wl,--check-sections -Wl,--gc-sections -Wl,--entry=Reset_Handler -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
 
 ifneq ("$(ACFG_$(BOARD_TAG).build.ldscript)",)
     LDFLAGS   += -T$(ARDUINO_VAR_PATH)/$(VARIANT)/$(ACFG_$(BOARD_TAG).build.ldscript)
 endif
+LDFLAGS += -Wl,-Map,$(OBJDIR)/$(TARGET).map
+LDFLAGS += $(ACFG_compiler.c.elf.extra_flags)
+
+LD_EXTRA_FLAGS += -L$(OBJDIR)
+LD_EXTRA_FLAGS += -Wl,--cref -Wl,--check-sections -Wl,--gc-sections -Wl,--entry=Reset_Handler
+LD_EXTRA_FLAGS += -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align
+
+LD_START_GROUP = -Wl,--start-group
+LD_GROUP_FLAGS += $(ACFG_compiler.combine.flags)
+LD_GROUP_FLAGS += $(ARDUINO_VAR_PATH)/$(VARIANT)/$(ACFG_$(BOARD_TAG).build.variant_system_lib)
+LD_END_GROUP = -Wl,--end-group
+
 
 # OBJCOPY_HEX_FLAGS = $(ACFG_compiler.elf2hex.flags)
 OBJCOPY_EEP_FLAGS = $(ACFG_compiler.objcopy.eep.flags)
@@ -262,9 +278,6 @@ OBJCOPY_EEP_FLAGS = $(ACFG_compiler.objcopy.eep.flags)
 # some fairly odd settings so that 'make upload' works
 #
 # may require additional patches for Windows support
-
-#do_upload: override get_monitor_port=""
-#AVRDUDE=@true
 
 TOUCH_PORT = $(strip $(ACFG_$(BOARD_TAG).upload.use_1200bps_touch))
 WAIT_PORT = $(strip $(ACFG_$(BOARD_TAG).upload.wait_for_upload_port))

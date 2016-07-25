@@ -792,7 +792,7 @@ ifeq ($(strip $(CHK_SOURCES)),)
                 $(call show_config_info,No .pde or .ino files found. If you are compiling .c or .cpp files then you need to explicitly include Arduino header files)
             else
                 #TODO: Support more than one file. https://github.com/sudar/Arduino-Makefile/issues/49
-                $(error Need exactly one .pde or .ino file. This makefile doesn't support multiple .ino/.pde files yet)
+                $(error Need exactly one .pde or .ino file. This makefile doesn\'t support multiple .ino/.pde files yet)
             endif
         endif
 
@@ -802,10 +802,13 @@ endif
 # core sources
 ifeq ($(strip $(NO_CORE)),)
     ifdef ARDUINO_CORE_PATH
+        CORE_CORE      += avr-libc
         CORE_C_SRCS     = $(wildcard $(ARDUINO_CORE_PATH)/*.c)
-        CORE_C_SRCS    += $(wildcard $(ARDUINO_CORE_PATH)/avr-libc/*.c)
+        CORE_C_SRCS    += $(foreach extracore, $(EXTRA_CORE), $(wildcard $(ARDUINO_CORE_PATH)/$(extracore)/*.c))
         CORE_CPP_SRCS   = $(wildcard $(ARDUINO_CORE_PATH)/*.cpp)
+        CORE_CPP_SRCS  += $(foreach extracore, $(EXTRA_CORE), $(wildcard $(ARDUINO_CORE_PATH)/$(extracore)/*.cpp))
         CORE_AS_SRCS    = $(wildcard $(ARDUINO_CORE_PATH)/*.S)
+        CORE_AS_SRCS   += $(foreach extracore, $(EXTRA_CORE), $(wildcard $(ARDUINO_CORE_PATH)/$(extracore)/*.S))
 
         ifneq ($(strip $(NO_CORE_MAIN_CPP)),)
             CORE_CPP_SRCS := $(filter-out %main.cpp, $(CORE_CPP_SRCS))
@@ -984,6 +987,18 @@ ifdef ARDUINO_PLATFORM_LIB_PATH
                              $(patsubst $(ARDUINO_PLATFORM_LIB_PATH)/%.c,$(OBJDIR)/platformlibs/%.c.o,$(PLATFORM_LIB_C_SRCS)) \
                              $(patsubst $(ARDUINO_PLATFORM_LIB_PATH)/%.S,$(OBJDIR)/platformlibs/%.S.o,$(PLATFORM_LIB_AS_SRCS))
 
+endif
+
+ifdef ARDUINO_VAR_PATH
+    ifdef VARIANT
+        VARIANT_INCLUDES := $(call get_library_includes,$(ARDUINO_VAR_PATH)/$(VARIANT))
+        VARIANT_CPP_SRCS := $(call get_library_files,$(ARDUINO_VAR_PATH)/$(VARIANT),cpp)
+        VARIANT_C_SRCS   := $(call get_library_files,$(ARDUINO_VAR_PATH)/$(VARIANT),c)
+        VARIANT_AS_SRCS  := $(call get_library_files,$(ARDUINO_VAR_PATH)/$(VARIANT),S)
+        VARIANT_OBJS     := $(patsubst $(ARDUINO_VAR_PATH)/$(VARIANT)/%.cpp,$(OBJDIR)/variantlibs/%.cpp.o,$(VARIANT_CPP_SRCS)) \
+                            $(patsubst $(ARDUINO_VAR_PATH)/$(VARIANT)/%.c,$(OBJDIR)/variantlibs/%.c.o,$(VARIANT_C_SRCS)) \
+                            $(patsubst $(ARDUINO_VAR_PATH)/$(VARIANT)/%.S,$(OBJDIR)/variantlibs/%.S.o,$(VARIANT_AS_SRCS))
+    endif
 endif
 
 # Dependency files
@@ -1204,6 +1219,19 @@ $(OBJDIR)/userlibs/%.c.o: $(USER_LIB_PATH)/%.c
 $(OBJDIR)/userlibs/%.S.o: $(USER_LIB_PATH)/%.S
 	@$(MKDIR) $(dir $@)
 	$(CC) -MMD -c $(CPPFLAGS) $(ASFLAGS) $< -o $@
+
+$(OBJDIR)/variantlibs/%.c.o: $(ARDUINO_VAR_PATH)/$(VARIANT)/%.c
+	@$(MKDIR) $(dir $@)
+	$(CC) -MMD -c $(CPPFLAGS) $(CFLAGS) $< -o $@
+
+$(OBJDIR)/variantlibs/%.cpp.o: $(ARDUINO_VAR_PATH)/$(VARIANT)/%.cpp
+	@$(MKDIR) $(dir $@)
+	$(CXX) -MMD -c $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+$(OBJDIR)/variantlibs/%.S.o: $(ARDUINO_VAR_PATH)/$(VARIANT)/%.S
+	@$(MKDIR) $(dir $@)
+	$(CC) -MMD -c $(CPPFLAGS) $(ASFLAGS) $< -o $@
+
 
 ifdef COMMON_DEPS
     COMMON_DEPS := $(COMMON_DEPS) $(MAKEFILE_LIST)
@@ -1443,10 +1471,14 @@ pre-build:
 		$(call runscript_if_exists,$(PRE_BUILD_HOOK))
 
 $(TARGET_ELF): 	$(LOCAL_OBJS) $(CORE_LIB) $(OTHER_OBJS)
-		$(CC) $(LDFLAGS) -o $@ $(LOCAL_OBJS) $(CORE_LIB) $(OTHER_OBJS) -lc -lm $(LINKER_SCRIPTS)
+		$(CC) $(LDFLAGS) -o $@ $(LD_EXTRA_FLAGS)\
+ $(LD_START_GROUP)\
+ $(LD_GROUP_FLAGS) $(LOCAL_OBJS) $(CORE_LIB) $(OTHER_OBJS)\
+ $(LD_END_GROUP)\
+ -lc -lm -gcc $(LINKER_SCRIPTS)
 
-$(CORE_LIB):	$(CORE_OBJS) $(LIB_OBJS) $(PLATFORM_LIB_OBJS) $(USER_LIB_OBJS)
-		$(AR) rcs $@ $(CORE_OBJS) $(LIB_OBJS) $(PLATFORM_LIB_OBJS) $(USER_LIB_OBJS)
+$(CORE_LIB):	$(CORE_OBJS) $(VARIANT_OBJS) $(LIB_OBJS) $(PLATFORM_LIB_OBJS) $(USER_LIB_OBJS)
+		$(AR) rcs $@ $(CORE_OBJS) $(VARIANT_OBJS) $(LIB_OBJS) $(PLATFORM_LIB_OBJS) $(USER_LIB_OBJS)
 
 error_on_caterina:
 		$(ERROR_ON_CATERINA)
